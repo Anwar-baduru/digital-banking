@@ -14,7 +14,7 @@ public class AccountNumberGenerator {
 
     private static String getAccountTypeCode(String type)
     {
-        return switch (type) {
+        return switch (type.trim().toLowerCase()) {
             case "current" -> "20";
             case "business" -> "30";
             default -> "10"; // for savings account as default
@@ -47,20 +47,47 @@ public class AccountNumberGenerator {
         return prefixStr+suffixStr;
     }
 
-    public String generateAccountNumber(String city, String bankRegion, String accountType)
+    public String generateAccountNumber(String city, String bankRegion, String accountType,BranchRegistry registry,TransactionManager manager)
     {
         // To fetch the Branch code
-        BranchRegistry registry = new BranchRegistry();
         String branchCode = registry.getBranchCode(city,bankRegion);
         if(branchCode.equalsIgnoreCase("ERROR"))
         {
+            System.out.println("INTERNAL ERROR: Contact customer support and share this error message");
             System.out.println("ERROR: Branch code not found for " + city + " (" + bankRegion + ")");
             return null; // Returned null to indicate generation failed
         }
 
-        StringBuilder uniqueAccountNumber = new StringBuilder();
-        uniqueAccountNumber.append(branchCode);
-        uniqueAccountNumber.append(getAccountTypeCode(accountType)); // fetching account type code
-        return uniqueAccountNumber.toString();
+        String typeCode=getAccountTypeCode(accountType); // fetching account type code
+
+        String finalAccountNumber="";
+        boolean isUnique=false; // to check if the generated account number is unique or not
+        while(!isUnique)
+        {
+            String nineDigitBlock=generateUniqueNineDigitBlock(); // fetching unique 9-digit number
+
+            /* For Developers/Technical Team : Just remove this below if condition, If the Bank wants to
+               open more accounts */
+            if(nineDigitBlock.length()>9)
+            {
+                System.out.println("INTERNAL ERROR: Contact customer support and share this error message");
+                System.out.println("ERROR: MAXIMUM ACCOUNT OPENING LIMITATION IS REACHED");
+                return null; // Returned null to indicate generation failed
+            }
+
+            StringBuilder uniqueAccountNumber = new StringBuilder();
+            uniqueAccountNumber.append(branchCode);
+            uniqueAccountNumber.append(typeCode);
+            uniqueAccountNumber.append(nineDigitBlock);
+            finalAccountNumber=uniqueAccountNumber.toString();
+
+            // to check if the generated account number is already present in accounts
+            if(!manager.doesAccountExist(finalAccountNumber))
+            {
+                isUnique=true;
+            }
+        }
+
+        return finalAccountNumber;
     }
 }
